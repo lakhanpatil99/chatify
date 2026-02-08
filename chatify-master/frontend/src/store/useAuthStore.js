@@ -91,7 +91,11 @@ export const useAuthStore = create((set, get) => ({
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error in update profile:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Failed to update profile";
+      const errorMessage =
+        error.userMessage ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update profile";
       toast.error(errorMessage);
     }
   },
@@ -99,9 +103,13 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: () => {
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
-
-    const socket = io(backendUrl || "http://localhost:3000", {
-      withCredentials: true, // this ensures cookies are sent with the connection
+    // Use same backend as API; fallback to localhost only in development
+    const socketUrl =
+      backendUrl ||
+      (import.meta.env.MODE === "development" ? "http://localhost:3000" : "");
+    if (!socketUrl) return; // skip socket if no backend in production
+    const socket = io(socketUrl, {
+      withCredentials: true,
     });
 
     socket.connect();
