@@ -16,7 +16,15 @@ Highlights:
 - 🎨 Beautiful UI with React, Tailwind CSS & DaisyUI
 - 🧠 Zustand for State Management
 - 🧑‍💻 Git & GitHub Workflow (branches, PRs, merges)
-- 🚀 Easy Deployment (free-tier friendly with Sevalla)
+- 🚀 Easy Deployment (Vercel frontend + backend on Render/other)
+
+---
+
+## 🚀 Deploy Frontend on Vercel
+
+1. Connect this repo to [Vercel](https://vercel.com). Root is the repo root; `vercel.json` is already configured.
+2. Set **Environment Variable** (Production): `VITE_BACKEND_URL` = your backend URL (e.g. `https://your-app.onrender.com`, no trailing slash).
+3. Deploy. The app is built from `chatify-master/frontend` and served from `chatify-master/frontend/dist`.
 
 ---
 

@@ -15,10 +15,4 @@ if ($LASTEXITCODE -ne 0) {
     exit
 }
 
-# 2. Vercel Deploy
-Write-Host "Deploying to Vercel..." -ForegroundColor Yellow
-# uses npx to ensure vercel is available without global install
-# --prod triggers a production deployment
-cmd /c "npx vercel --prod"
-
 Write-Host "Done! Changes are live." -ForegroundColor Green

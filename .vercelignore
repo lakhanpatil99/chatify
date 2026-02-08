@@ -1,0 +1,14 @@
+# Backend (not used for static frontend deploy)
+chatify-master/backend
+
+# Root-level node_modules (install runs in frontend only)
+node_modules
+
+# Development / env (never deploy secrets)
+.env
+.env.*
+!.env.example
+
+# Git and IDE
+.git
+.vercel
