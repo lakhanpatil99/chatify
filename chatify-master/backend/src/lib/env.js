@@ -1,9 +1,10 @@
 import "dotenv/config";
 
 const rawClientUrl = process.env.CLIENT_URL || "";
+// Normalize: trim + remove trailing slash so CORS matches browser Origin (e.g. https://chatify-gamma-one.vercel.app)
 const corsOrigins = rawClientUrl
   .split(",")
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
 export const ENV = {
