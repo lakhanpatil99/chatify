@@ -79,8 +79,8 @@ export const useAuthStore = create((set, get) => ({
       toast.success("Logged out successfully");
       get().disconnectSocket();
     } catch (error) {
-      toast.error("Error logging out");
-      console.log("Logout error:", error);
+      toast.error(error.userMessage || "Error logging out");
+      console.error("Logout error:", error);
     }
   },
 
@@ -103,13 +103,9 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: () => {
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
-    // Use same backend as API; fallback to localhost only in development
-    const socketUrl =
-      backendUrl ||
-      (import.meta.env.MODE === "development" ? "http://localhost:3000" : "");
-    if (!socketUrl) return; // skip socket if no backend in production
-    const socket = io(socketUrl, {
-      withCredentials: true,
+
+    const socket = io(backendUrl || "http://localhost:3000", {
+      withCredentials: true, // this ensures cookies are sent with the connection
     });
 
     socket.connect();
