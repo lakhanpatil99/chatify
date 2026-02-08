@@ -1,6 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
+import fs from "fs";
 import cors from "cors";
 
 import authRoutes from "./routes/auth.route.js";
@@ -20,18 +21,32 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
-// make ready for deployment
-if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+// In production: serve frontend only if deployed together; else show API info at root
+const frontendDist = path.join(__dirname, "../frontend/dist");
 
-  // Serve frontend for all non-API routes (SPA fallback)
-  app.get("*", (req, res, next) => {
-    // Skip API routes - they should be handled by the routes above
-    if (req.path.startsWith("/api")) {
-      return next();
-    }
-    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-  });
+if (ENV.NODE_ENV === "production") {
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api")) return next();
+      res.sendFile(path.join(frontendDist, "index.html"));
+    });
+  } else {
+    // Backend-only deploy (e.g. Render): show a simple message at root
+    app.get("/", (_, res) => {
+      res.set("Content-Type", "text/html");
+      res.send(`
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>Chatify API</title></head>
+        <body style="font-family:sans-serif;max-width:600px;margin:2rem auto;padding:1rem;background:#1e293b;color:#e2e8f0;">
+          <h1>Chatify API</h1>
+          <p>Backend is running. Use the frontend to sign in:</p>
+          <p><a href="https://chatify-gamma-one.vercel.app" style="color:#818cf8;">chatify-gamma-one.vercel.app</a></p>
+          <p><small>API: /api/auth, /api/messages</small></p>
+        </body></html>
+      `);
+    });
+  }
 }
 
 server.listen(PORT, () => {
