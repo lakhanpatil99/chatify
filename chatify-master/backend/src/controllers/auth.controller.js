@@ -84,6 +84,15 @@ export const login = async (req, res) => {
 
     generateToken(user._id, res);
 
+    // Send welcome email if logging in for the first time or if it wasn't sent before
+    // Since we don't track "isFirstLogin", we can just send it here for testing purposes
+    // In a real app, you might want to add a flag to the user model
+    try {
+      await sendWelcomeEmail(user.email, user.fullName, ENV.CLIENT_URL);
+    } catch (error) {
+      console.error("Failed to send welcome email on login:", error);
+    }
+
     res.status(200).json({
       _id: user._id,
       fullName: user.fullName,

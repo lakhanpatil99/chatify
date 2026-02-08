@@ -45,18 +45,18 @@ function MessageInput() {
   };
 
   return (
-    <div className="p-4 border-t border-slate-700/50">
+    <div className="p-4 border-t border-base-300">
       {imagePreview && (
         <div className="max-w-3xl mx-auto mb-3 flex items-center">
           <div className="relative">
             <img
               src={imagePreview}
               alt="Preview"
-              className="w-20 h-20 object-cover rounded-lg border border-slate-700"
+              className="w-20 h-20 object-cover rounded-lg border border-base-300"
             />
             <button
               onClick={removeImage}
-              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-slate-200 hover:bg-slate-700"
+              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-base-300 flex items-center justify-center text-base-content hover:bg-base-content/20"
               type="button"
             >
               <XIcon className="w-4 h-4" />
@@ -73,7 +73,7 @@ function MessageInput() {
             setText(e.target.value);
             isSoundEnabled && playRandomKeyStrokeSound();
           }}
-          className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg py-2 px-4"
+          className="flex-1 input bg-base-200/50 border-base-300 focus:outline-none"
           placeholder="Type your message..."
         />
 
@@ -88,8 +88,8 @@ function MessageInput() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className={`bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg px-4 transition-colors ${
-            imagePreview ? "text-cyan-500" : ""
+          className={`btn btn-circle btn-ghost btn-sm md:btn-md text-neutral-content/70 hover:text-base-content ${
+            imagePreview ? "text-primary" : ""
           }`}
         >
           <ImageIcon className="w-5 h-5" />
@@ -97,9 +97,9 @@ function MessageInput() {
         <button
           type="submit"
           disabled={!text.trim() && !imagePreview}
-          className="bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg px-4 py-2 font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-primary btn-circle btn-sm md:btn-md"
         >
-          <SendIcon className="w-5 h-5" />
+          <SendIcon className="size-5" />
         </button>
       </form>
     </div>
