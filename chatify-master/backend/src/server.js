@@ -24,12 +24,19 @@ app.use("/api/messages", messageRoutes);
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
-  app.get("*", (_, res) => {
+  // Serve frontend for all non-API routes (SPA fallback)
+  app.get("*", (req, res, next) => {
+    // Skip API routes - they should be handled by the routes above
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
     res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
   });
 }
 
 server.listen(PORT, () => {
   console.log("Server running on port: " + PORT);
+  console.log("🌐 CORS allowed origins:", ENV.CORS_ORIGINS);
+  console.log("🔐 Environment:", ENV.NODE_ENV);
   connectDB();
 });
