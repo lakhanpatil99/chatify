@@ -14,14 +14,33 @@ const __dirname = path.resolve();
 
 const PORT = ENV.PORT || 3000;
 
+// ✅ ALLOW BOTH LOCAL + VERCEL FRONTEND (FIX)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://chatify-gamma-one.vercel.app"
+];
+
 app.use(express.json({ limit: "5mb" })); // req.body
-app.use(cors({ origin: ENV.CORS_ORIGINS, credentials: true }));
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log("❌ Blocked by CORS:", origin);
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
-// In production: serve frontend only if deployed together; else show API info at root
 const frontendDist = path.join(__dirname, "../frontend/dist");
 
 if (ENV.NODE_ENV === "production") {
@@ -32,7 +51,6 @@ if (ENV.NODE_ENV === "production") {
       res.sendFile(path.join(frontendDist, "index.html"));
     });
   } else {
-    // Backend-only deploy (e.g. Render): show a simple message at root
     app.get("/", (_, res) => {
       res.set("Content-Type", "text/html");
       res.send(`
@@ -51,7 +69,7 @@ if (ENV.NODE_ENV === "production") {
 
 server.listen(PORT, () => {
   console.log("Server running on port: " + PORT);
-  console.log("🌐 CORS allowed origins:", ENV.CORS_ORIGINS);
+  console.log("🌐 Allowed CORS origins:", allowedOrigins);
   console.log("🔐 Environment:", ENV.NODE_ENV);
   connectDB();
 });
