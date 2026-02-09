@@ -115,9 +115,10 @@ export const useAuthStore = create((set, get) => ({
       if (!user.emailVerified) {
         const message = "Please verify your email first!";
         toast.error(message);
-        // Optional: also show a native alert for extra clarity
-        // window.alert(message);
-        return;
+        if (typeof window !== "undefined") {
+          window.alert(message);
+        }
+        return; // Block login: do NOT call backend
       }
 
       // 3. If verified, continue with existing backend login flow
