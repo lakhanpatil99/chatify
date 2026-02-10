@@ -65,8 +65,9 @@ export const useAuthStore = create((set, get) => ({
         password,
       });
 
-      // ❌ VERY IMPORTANT: DO NOT log the user in automatically
+      // IMPORTANT FIX: DO NOT keep Firebase session
       await signOut(auth);
+
       set({ authUser: null });
 
       toast.success(
@@ -118,6 +119,7 @@ export const useAuthStore = create((set, get) => ({
       if (!user.emailVerified) {
         toast.error("Please verify your email first!");
         await signOut(auth);
+        set({ isLoggingIn: false });
         return;
       }
 
