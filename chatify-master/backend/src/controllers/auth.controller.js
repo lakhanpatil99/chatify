@@ -1,3 +1,4 @@
+// backend/src/controllers/auth.controller.js
 import { sendWelcomeEmail } from "../emails/emailHandlers.js";
 import { generateToken } from "../lib/utils.js";
 import User from "../models/User.js";
@@ -14,21 +15,19 @@ export const signup = async (req, res) => {
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters" });
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
+    // check if emailis valid: regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
     const user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
+    if (user) return res.status(400).json({ message: "Email already exists" });
 
+    // 123456 => $dnjasdkasj_?dmsakmk
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -36,32 +35,28 @@ export const signup = async (req, res) => {
       fullName,
       email,
       password: hashedPassword,
-      isVerified: false, // IMPORTANT FLAG
     });
 
-    const savedUser = await newUser.save();
+    if (newUser) {
+      const savedUser = await newUser.save();
 
-    // ❌ DO NOT generate token here (prevents auto-login)
-    // generateToken(savedUser._id, res);
+      // IMPORTANT: Do NOT generate JWT on signup.
+      // JWT cookie is only issued on successful /login.
+      res.status(201).json({
+        _id: savedUser._id,
+        fullName: savedUser.fullName,
+        email: savedUser.email,
+        profilePic: savedUser.profilePic,
+      });
 
-    // Send welcome email (optional)
-    try {
-      await sendWelcomeEmail(
-        savedUser.email,
-        savedUser.fullName,
-        ENV.CLIENT_URL
-      );
-    } catch (error) {
-      console.error("Failed to send welcome email:", error);
+      try {
+        await sendWelcomeEmail(savedUser.email, savedUser.fullName, ENV.CLIENT_URL);
+      } catch (error) {
+        console.error("Failed to send welcome email:", error);
+      }
+    } else {
+      res.status(400).json({ message: "Invalid user data" });
     }
-
-    return res.status(201).json({
-      _id: savedUser._id,
-      fullName: savedUser.fullName,
-      email: savedUser.email,
-      profilePic: savedUser.profilePic,
-      message: "Account created. Please verify your email before login.",
-    });
   } catch (error) {
     console.log("Error in signup controller:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -72,31 +67,28 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res
-      .status(400)
-      .json({ message: "Email and password are required" });
+    return res.status(400).json({ message: "Email and password are required" });
   }
 
   try {
     const user = await User.findOne({ email });
-    if (!user)
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    // never tell the client which one is incorrect: password or email
 
-    const isPasswordCorrect = await bcrypt.compare(
-      password,
-      user.password
-    );
-    if (!isPasswordCorrect)
-      return res.status(400).json({ message: "Invalid credentials" });
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) return res.status(400).json({ message: "Invalid credentials" });
 
-    // ✅ LOGIN ONLY AFTER EMAIL IS VERIFIED (extra safety)
-    if (!user.isVerified) {
-      return res.status(403).json({
-        message: "Please verify your email before logging in.",
-      });
-    }
-
+    // JWT is only generated on login
     generateToken(user._id, res);
+
+    // Send welcome email if logging in for the first time or if it wasn't sent before
+    // Since we don't track "isFirstLogin", we can just send it here for testing purposes
+    // In a real app, you might want to add a flag to the user model
+    try {
+      await sendWelcomeEmail(user.email, user.fullName, ENV.CLIENT_URL);
+    } catch (error) {
+      console.error("Failed to send welcome email on login:", error);
+    }
 
     res.status(200).json({
       _id: user._id,
@@ -117,15 +109,13 @@ export const logout = (_, res) => {
     sameSite: ENV.NODE_ENV === "development" ? "strict" : "none",
     secure: ENV.NODE_ENV === "development" ? false : true,
   });
-
   res.status(200).json({ message: "Logged out successfully" });
 };
 
 export const updateProfile = async (req, res) => {
   try {
     const { profilePic } = req.body;
-    if (!profilePic)
-      return res.status(400).json({ message: "Profile pic is required" });
+    if (!profilePic) return res.status(400).json({ message: "Profile pic is required" });
 
     const userId = req.user._id;
 
