@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   signInWithEmailAndPassword,
+  signOut,
 } from "firebase/auth";
 import { auth } from "../firebase";
 
@@ -39,6 +40,7 @@ export const useAuthStore = create((set, get) => ({
 
   signup: async (data) => {
     set({ isSigningUp: true });
+
     try {
       const { fullName, email, password } = data;
 
@@ -48,72 +50,51 @@ export const useAuthStore = create((set, get) => ({
         email,
         password
       );
+
       const user = userCredential?.user;
-      if (!user) {
-        throw new Error("Signup failed: no user returned from Firebase.");
-      }
+      if (!user) throw new Error("Firebase signup failed");
 
       // 2) Send email verification
-      try {
-        await sendEmailVerification(user);
-        toast.success("Verification email sent! Please check your inbox.");
-      } catch (verificationError) {
-        console.error(
-          "Error sending verification email:",
-          verificationError
-        );
-        toast.error(
-          "Failed to send verification email. Please try again later."
-        );
-        set({ isSigningUp: false });
-        return; // DO NOT call backend if email failed
-      }
+      await sendEmailVerification(user);
+      toast.success("Verification email sent! Check your inbox.");
 
-      const firebaseUid = user.uid;
-
-      // 3) Call your existing backend AFTER Firebase signup
-      const res = await axiosInstance.post("/auth/signup", {
+      // 3) Create user in MongoDB (backend)
+      await axiosInstance.post("/auth/signup", {
         fullName,
-        password,
-        name: fullName, // your backend expects this
         email,
-        firebaseUid,
+        password,
       });
 
-      set({ authUser: res.data });
+      // ❌ VERY IMPORTANT: DO NOT log the user in automatically
+      await signOut(auth);
+      set({ authUser: null });
 
       toast.success(
         "Account created! Verify your email before logging in."
       );
-      get().connectSocket();
     } catch (error) {
+      console.error("Signup error:", error);
+
       let errorMessage =
-        error.userMessage ||
         error.response?.data?.message ||
         error.message ||
-        "Failed to create account";
+        "Signup failed";
 
-      if (error.code && error.code.startsWith("auth/")) {
+      if (error.code?.startsWith("auth/")) {
         switch (error.code) {
           case "auth/email-already-in-use":
-            errorMessage =
-              "This email is already in use. Try logging in instead.";
+            errorMessage = "Email already in use. Try login.";
             break;
           case "auth/invalid-email":
-            errorMessage = "Please enter a valid email address.";
+            errorMessage = "Invalid email address.";
             break;
           case "auth/weak-password":
-            errorMessage =
-              "Password is too weak. Please choose a stronger one.";
+            errorMessage = "Password is too weak.";
             break;
-          default:
-            errorMessage =
-              "Failed to create account with Firebase. Try again.";
         }
       }
 
       toast.error(errorMessage);
-      console.error("Signup error:", error);
     } finally {
       set({ isSigningUp: false });
     }
@@ -121,10 +102,11 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (data) => {
     set({ isLoggingIn: true });
+
     try {
       const { email, password } = data;
 
-      // 1) Sign in with Firebase
+      // 1) Sign in with Firebase first
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
@@ -132,53 +114,35 @@ export const useAuthStore = create((set, get) => ({
       );
       const user = userCredential.user;
 
-      // 2) BLOCK login if email is NOT verified
+      // 2) Block login if email is NOT verified
       if (!user.emailVerified) {
-        const message = "Please verify your email first!";
-        toast.error(message);
-        if (typeof window !== "undefined") {
-          window.alert(message);
-        }
-        set({ isLoggingIn: false }); // IMPORTANT FIX
+        toast.error("Please verify your email first!");
+        await signOut(auth);
         return;
       }
 
-      // 3) If verified, continue with your existing backend login
+      // 3) Now call backend to get JWT cookie
       const res = await axiosInstance.post("/auth/login", {
         email,
         password,
-        firebaseUid: user.uid, // IMPORTANT FIX
       });
 
       set({ authUser: res.data });
-
       toast.success("Logged in successfully");
       get().connectSocket();
     } catch (error) {
+      console.error("Login error:", error);
+
       let errorMessage =
-        error.userMessage ||
         error.response?.data?.message ||
         error.message ||
-        "Failed to login";
+        "Login failed";
 
-      if (error.code && error.code.startsWith("auth/")) {
-        switch (error.code) {
-          case "auth/invalid-credential":
-          case "auth/wrong-password":
-          case "auth/user-not-found":
-            errorMessage = "Invalid email or password.";
-            break;
-          case "auth/invalid-email":
-            errorMessage = "Please enter a valid email address.";
-            break;
-          default:
-            errorMessage =
-              "Failed to login with Firebase. Please try again.";
-        }
+      if (error.code?.startsWith("auth/")) {
+        errorMessage = "Invalid email or password.";
       }
 
       toast.error(errorMessage);
-      console.error("Login error:", error);
     } finally {
       set({ isLoggingIn: false });
     }
@@ -187,31 +151,12 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try {
       await axiosInstance.post("/auth/logout");
+      await signOut(auth);
       set({ authUser: null });
       toast.success("Logged out successfully");
       get().disconnectSocket();
     } catch (error) {
-      toast.error(error.userMessage || "Error logging out");
-      console.error("Logout error:", error);
-    }
-  },
-
-  updateProfile: async (data) => {
-    try {
-      const res = await axiosInstance.put(
-        "/auth/update-profile",
-        data
-      );
-      set({ authUser: res.data });
-      toast.success("Profile updated successfully");
-    } catch (error) {
-      console.error("Error in update profile:", error);
-      const errorMessage =
-        error.userMessage ||
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to update profile";
-      toast.error(errorMessage);
+      toast.error("Logout failed");
     }
   },
 
@@ -219,11 +164,8 @@ export const useAuthStore = create((set, get) => ({
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
 
-    const socket = io(backendUrl || "http://localhost:3000", {
-      withCredentials: true,
-    });
+    const socket = io(backendUrl, { withCredentials: true });
 
-    socket.connect();
     set({ socket });
 
     socket.on("getOnlineUsers", (userIds) => {
